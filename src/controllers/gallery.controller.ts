@@ -1,5 +1,6 @@
 import { Request, Response } from 'express';
 import GalleryItem from '../models/Gallery';
+import cloudinary from '../config/cloudinary';
 
 export const getGallery = async (req: Request, res: Response) => {
   try {
@@ -17,6 +18,43 @@ export const createGalleryItem = async (req: Request, res: Response) => {
     res.status(201).json(item);
   } catch (error: any) {
     res.status(400).json({ message: error.message });
+  }
+};
+
+export const uploadGalleryItem = (req: Request, res: Response) => {
+  try {
+    if (!req.file) {
+      return res.status(400).json({ message: 'No file provided' });
+    }
+
+    const { category, styleName, price } = req.body;
+
+    const uploadStream = cloudinary.uploader.upload_stream(
+      { folder: 'sweetibraids_gallery' },
+      async (error, result) => {
+        if (error) {
+          console.error('Cloudinary upload error:', error);
+          return res.status(500).json({ message: 'Upload failed', error });
+        }
+
+        try {
+          const item = new GalleryItem({
+            imageUrl: result?.secure_url,
+            category,
+            styleName,
+            price
+          });
+          await item.save();
+          return res.status(201).json(item);
+        } catch (dbError: any) {
+          return res.status(500).json({ message: dbError.message });
+        }
+      }
+    );
+
+    uploadStream.end(req.file.buffer);
+  } catch (error: any) {
+    res.status(500).json({ message: error.message });
   }
 };
 
